@@ -1,0 +1,91 @@
+---
+  - hosts: dcos-master:dcos-slave:dcos-bs
+    become: true
+    tasks:
+      # - selinux: state=disabled
+
+      - action: ping
+      - name: setup docker repo
+        copy: src=roles/common/files/docker/docker-main.repo dest=/etc/yum.repos.d/docker-main.repo
+
+      - name: install docker storage config file
+        copy: src=roles/common/files/docker/docker.service dest=/etc/systemd/system/docker.service.d/override.conf
+
+      - name: install docker engine
+        yum: name=docker-engine update_cache=yes state=present
+
+      - name: add centos to docker group
+        user: name=centos groups=docker append=yes
+
+      - name: stop docker service
+        service: name=docker state=stopped
+
+      - name: remove old /var/lib/docker
+        file: dest=/var/lib/docker state=absent
+
+      - name: systemd reload
+        command: /bin/systemctl daemon-reload
+
+      - name: start docker
+        service: name=docker state=started enabled=true
+
+      - name: install private ssh key
+        copy: src=roles/common/files/ssh-keys/vishnu.pub dest=~centos/.ssh/authorized_keys owner=centos mode=0600
+
+  - hosts: dcos-bs
+    become: True
+    vars:
+      staging: ~centos/genconf
+    vars_files:
+      - ../vars/common.yml
+    tasks:
+      - name: create staging folder
+        file: dest={{staging}} state=directory owner=centos
+
+      - name: create ip-detect script
+        template: src=roles/common/templates/ip-detect.j2 dest={{staging}}/ip-detect mode=0755 owner=centos
+
+      - name: create deploy config
+        template: src=roles/common/templates/config.yaml.j2 dest={{staging}}/config.yaml owner=centos
+
+      - name: install private ssh key
+        copy: src=roles/common/files/ssh-keys/vishnu dest=~centos/.ssh/id_rsa owner=centos mode=0600
+
+      - name: install private ssh key
+        copy: src=roles/common/files/ssh-keys/vishnu.pub dest=~centos/.ssh/id_rsa.pub owner=centos mode=0600
+
+      - name: copy private ssh key
+        copy: src=roles/common/files/ssh-keys/vishnu dest={{staging}}/ssh_key owner=centos mode=0600
+
+      - name: fetch generate_config.sh script
+        get_url:
+          url: https://downloads.dcos.io/dcos/EarlyAccess/dcos_generate_config.sh
+          dest: '~centos/dcos_generate_config.sh'
+          mode: 0755
+          owner: centos
+
+    #  - name: Execute the script
+    #    shell: ~centos/dcos_generate_config.sh --genconf && \
+    #           sudo bash dcos_generate_config.sh --install-prereqs && \
+    #           sudo bash dcos_generate_config.sh --preflight && \
+    #           sudo bash dcos_generate_config.sh --deploy && \
+    #           sudo bash dcos_generate_config.sh --postflight
+
+      - name: Remove the tar file
+        #file: path=~centos/*.tar state=absent
+        shell: rm -rvf ~centos/*.tar
+
+      - name: Execute the dc/os installer script
+        shell: ~centos/dcos_generate_config.sh --genconf
+
+      - name: Execute the cluster prerequisites
+        shell: ~centos/dcos_generate_config.sh --install-prereqs
+
+      - name: Execute the preflight script to validate that your cluster is installable
+        shell: ~centos/dcos_generate_config.sh --preflight
+
+      - name: Deploy dc/os
+        shell: ~centos/dcos_generate_config.sh --deploy
+
+      - name: Run the DC/OS diagnostic script to verify that services are up and running
+        shell:  ~centos/dcos_generate_config.sh --postflight

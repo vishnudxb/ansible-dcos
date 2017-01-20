@@ -1,0 +1,155 @@
+---
+- name: Setup AWS EC2 for dcos slaves...
+  hosts: localhost
+  gather_facts: false
+  become: false
+  vars:
+    instance_role: dcos-slave
+  pre_tasks:
+    - include_vars: ../vars/common.yml
+  tasks:
+    - name: Starting dcos slave machine
+      ec2:
+          instance_type: '{{ instance_type }}'
+          region: '{{ aws_region }}'
+          zone: '{{aws_region}}{{instance_zone}}'
+          image: '{{ centos_ami }}'
+          key_name: '{{ aws_key_name }}'
+          vpc_subnet_id: '{{ aws_vpc_subnet_id }}'
+          group_id: '{{ instance_sg_id_dcos_slave }}'
+          instance_profile_name: '{{ instance_profile }}'
+          instance_tags:
+              Name: '{{ instance_role_slave }}-{{ item }}'
+              Role: '{{ instance_role }}'
+              Env: '{{ aws_env }}'
+          count_tag:
+              Name: '{{ instance_role_slave }}'
+          volumes:
+          - device_name: '/dev/sda1'
+            volume_size: '32'
+            volume_type: 'gp2'
+            delete_on_termination: true
+          exact_count: 1
+          wait: yes
+
+      register: ec2_info
+      with_items:
+        - 1
+        - 2
+        - 3
+        - 4
+
+    - ec2_remote_facts:
+        region: "{{ aws_region }}"
+        filters:
+          instance-state-name: running
+          availability-zone: '{{ aws_region }}{{ instance_zone }}'
+          "tag:Role": '{{ instance_role_slave }}'
+      register: nodes
+
+    - name: wait for SSH to come up
+      wait_for: host="{{ item.private_ip_address }}" port=22 timeout=650 state=started
+      with_items:
+        - "{{ nodes.instances[0] }}"
+        - "{{ nodes.instances[1] }}"
+        - "{{ nodes.instances[2] }}"
+        - "{{ nodes.instances[3] }}"
+
+    - name: Make an ad-hock group with the running instance
+      add_host: hostname="{{ item.private_ip_address }}" groupname=slaves
+      with_items:
+        - "{{ nodes.instances[0] }}"
+        - "{{ nodes.instances[1] }}"
+        - "{{ nodes.instances[2] }}"
+        - "{{ nodes.instances[3] }}"
+
+- name: Setup Route53
+  hosts: localhost
+  gather_facts: false
+  become: false
+  vars:
+    instance_role: dcos-slave
+  pre_tasks:
+    - include_vars: ../vars/common.yml
+
+  tasks:
+
+    - name: create internal DNS records for slaves
+      route53:
+        command: create
+        private_zone: no
+        overwrite: yes
+        zone: "{{ private_domain }}"
+        record: "{{ instance_role_slave }}.{{ private_domain }}"
+        type: A
+        ttl: 60
+        value: "{{ nodes.instances[0].private_ip_address }},{{ nodes.instances[1].private_ip_address }},{{ nodes.instances[2].private_ip_address }},{{ nodes.instances[3].private_ip_address }}"
+        wait: yes
+        wait_timeout: 100
+
+    - name: create internal DNS records for slave1
+      route53:
+        command: create
+        private_zone: no
+        overwrite: yes
+        zone: "{{ private_domain }}"
+        record: "{{ instance_role_slave }}-1.{{ private_domain }}"
+        type: A
+        ttl: 60
+        value: "{{ nodes.instances[0].private_ip_address }}"
+        wait: yes
+        wait_timeout: 100
+
+    - name: create internal DNS records for slave2
+      route53:
+        command: create
+        private_zone: no
+        overwrite: yes
+        zone: "{{ private_domain }}"
+        record: "{{ instance_role_slave }}-2.{{ private_domain }}"
+        type: A
+        ttl: 60
+        value: "{{ nodes.instances[1].private_ip_address }}"
+        wait: yes
+        wait_timeout: 100
+
+    - name: create internal DNS records for slave3
+      route53:
+        command: create
+        private_zone: no
+        overwrite: yes
+        zone: "{{ private_domain }}"
+        record: "{{ instance_role_slave }}-3.{{ private_domain }}"
+        type: A
+        ttl: 60
+        value: "{{ nodes.instances[2].private_ip_address }}"
+        wait: yes
+        wait_timeout: 100
+
+    - name: create internal DNS records for slave4
+      route53:
+        command: create
+        private_zone: no
+        overwrite: yes
+        zone: "{{ private_domain }}"
+        record: "{{ instance_role_slave }}-4.{{ private_domain }}"
+        type: A
+        ttl: 60
+        value: "{{ nodes.instances[3].private_ip_address }}"
+        wait: yes
+        wait_timeout: 100
+
+    - name: Copy templates
+      template: src=roles/common/templates/hosts.j2 dest=../inventories/{{ instance_role }}
+
+- name: Configured instances for dcos-slave servers
+  hosts: dcos-slave
+  gather_facts: true
+  become: yes
+  become_user: root
+  vars:
+    instance_role: dcos-slave
+  pre_tasks:
+    - include_vars: ../vars/common.yml
+  roles:
+    - common

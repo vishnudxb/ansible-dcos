@@ -1,0 +1,11 @@
+---
+  - name: Make sure the user exists
+    user: name={{item}} groups='wheel,adm' append=yes generate_ssh_key=no shell=/bin/bash
+    with_items: '{{aws_admins}}'
+
+  - name: copy keys
+    lineinfile: dest=~{{ item }}/.ssh/authorized_keys  line="{{ lookup('file', 'ssh-keys/'+item+'.pub')}}" state=present create=yes mode=0600 owner={{ item }}
+    with_items: '{{aws_admins}}'
+
+  - name: Make sure sudoers contains NOPASSWD for sudo group
+    shell: "creates=/etc/sudoers.bak chdir=/etc cp sudoers sudoers.bak && sed -ri -e 's/(%wheel\\s+ALL=\\(ALL\\))\\s+ALL/\\1 NOPASSWD: ALL/' /etc/sudoers"

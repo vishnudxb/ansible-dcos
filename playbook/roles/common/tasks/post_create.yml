@@ -1,0 +1,65 @@
+---
+  - name: set hostname
+    hostname: name='{{ instance_role }}.{{private_domain}}'
+
+  - name: disable changing hostname during reboot
+    lineinfile:
+      dest: /etc/cloud/cloud.cfg
+      line: "preserve_hostname: true"
+      state: present
+
+  - name: Install epel-release
+    yum:
+      name: "{{ epel_rpm_url }}"
+      state: present
+      update_cache: yes
+
+  - name: disable selinux
+    selinux: state=disabled
+
+  - name: install usefull packages
+    yum: name={{item}} state=present
+    with_items:
+      - vim-enhanced
+      - mlocate
+      - bind-utils
+      - python-pip
+      - jq
+      - ntp
+      - wget
+
+  - name: upgrade pip
+    pip: name=pip state=latest
+
+  - name: install docker-compose
+    pip: name=docker-compose state=latest
+
+  - name: setup docker repo
+    copy: src=docker/docker-main.repo dest=/etc/yum.repos.d/docker-main.repo
+
+  - name: create folder for docker service overrides
+    file: dest=/etc/systemd/system/docker.service.d state=directory
+
+  - name: install docker storage config file
+    copy: src=docker/override.conf dest=/etc/systemd/system/docker.service.d/override.conf
+
+  - name: install docker engine
+    yum: name=docker-engine update_cache=yes state=present
+
+  - name: add centos to docker group
+    user: name=centos groups=docker append=yes
+
+  - name: stop docker service
+    service: name=docker state=stopped
+
+  - name: remove old /var/lib/docker
+    file: dest=/var/lib/docker state=absent
+
+  - name: systemd reload
+    command: /bin/systemctl daemon-reload
+
+  - name: start docker
+    service: name=docker state=started enabled=true
+
+  - name: start ntpd
+    service: name=ntpd state=started enabled=true

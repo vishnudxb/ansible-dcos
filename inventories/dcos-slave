@@ -1,0 +1,5 @@
+[dcos-slave]
+dcos-slave-1.example.com
+dcos-slave-2.example.com
+dcos-slave-4.example.com
+dcos-slave-3.example.com

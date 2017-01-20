@@ -1,0 +1,27 @@
+---
+centos_ami: ami-0389a870
+aws_region: eu-west-1
+aws_vpc_subnet_id: subnet-xxxx
+private_domain: example.com
+aws_key_name: awskeypair
+instance_zone: b
+instance_type: t2.large
+instance_sg_id: sg-xxxx
+instance_sg_id_dcos_master: sg-xxx
+instance_sg_id_dcos_slave: sg-xxx
+instance_profile: "dcos"
+instance_role_bs: dcos-bs
+instance_role_master: dcos-master
+instance_role_slave: dcos-slave
+aws_env: development
+
+
+aws_admins:
+  - vishnu
+
+devs:
+  - vishnu
+
+epel_rpm_url: "http://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
+
+epel_yum: "epel-release"

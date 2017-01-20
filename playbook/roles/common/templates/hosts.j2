@@ -1,0 +1,4 @@
+[{{instance_role}}]
+{% for host in nodes.instances %}
+{{host.tags['Name']}}.{{private_domain}} ansible_connection=ssh ansible_user=centos
+{% endfor %}
