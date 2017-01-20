@@ -1,7 +1,7 @@
 # ansible-dcos
 Ansible playbook for dc/os
 
-# This playbook can be used for AWS as well on-premises.
+# This playbook can be used for AWS as well as on-premises.
 For more info: Check [here](https://www.vishnu-tech.com/blog/ansible-dcos/)
 
 # Variables
@@ -48,7 +48,7 @@ ansible-playbook playbook/dcos-setup.yml --private-key <path to your aws key>
 
 ```
 
-# To run in on-premises, remove the aws parts in the playbook & use it as below. Also alter the inventories according to your on-premise setup
+To run in on-premises, remove the aws parts in the playbook & use it as below. Also alter the inventories according to your on-premise setup
 
 ```
 Example: For bootstrap node
